@@ -7,15 +7,16 @@ import soundfile as sf
 import torch
 from tqdm import tqdm
 
+from main import OUT_DIR
 from utilities.fitness_scorer import FitnessScorer
 from utilities.initial_selector import InitialSelector
 from utilities.speech_generator import SpeechGenerator
 from utilities.voice_generator import VoiceGenerator
 
-OUT_DIR = os.environ.get("KVOICEWALK_OUT_DIR", "../out")
 
 class KVoiceWalk:
-    def __init__(self,target_audio: str,target_text: str,other_text:str,voice_folder:str,interpolate_start: bool,population_limit: int, starting_voice: str) -> None:
+    def __init__(self, target_audio: str, target_text: str, other_text: str, voice_folder: str, interpolate_start: bool,
+                 population_limit: int, starting_voice: str, output_name: str) -> None:
         self.target_audio = target_audio
         self.target_text = target_text
         self.other_text = other_text
@@ -30,11 +31,9 @@ class KVoiceWalk:
         self.voice_generator = VoiceGenerator(voices,starting_voice)
         # Either the mean or the supplied voice tensor
         self.starting_voice = self.voice_generator.starting_voice
+        self.output_name = output_name
 
     def random_walk(self,step_limit: int):
-        # Start Run Timer
-        start_time = datetime.datetime.now()
-
         # Score Initial Voice
         best_voice = self.starting_voice
         best_results = self.score_voice(self.starting_voice)
@@ -42,11 +41,10 @@ class KVoiceWalk:
         t.write(f'Target Sim:{best_results["target_similarity"]:.3f}, Self Sim:{best_results["self_similarity"]:.3f}, Feature Sim:{best_results["feature_similarity"]:.2f}, Score:{best_results["score"]:.2f}')
 
         # Create Results Directory
-        results_dir = f"{OUT_DIR}/{self.target_audio}_{best_voice}_{datetime.datetime.now()}"
+        results_dir = f"{OUT_DIR}/{self.output_name}_{self.target_audio}_{str(datetime.datetime.now())}"
         os.makedirs(results_dir, exist_ok=True)
 
         # Random Walk Loop
-
         for i in tqdm(range(step_limit)):
             # TODO: Expose to CLI
             diversity = random.uniform(0.01,0.15)
@@ -62,17 +60,18 @@ class KVoiceWalk:
                 best_voice = voice
                 t.write(f'Step:{i:<4} Target Sim:{best_results["target_similarity"]:.3f} Self Sim:{best_results["self_similarity"]:.3f} Feature Sim:{best_results["feature_similarity"]:.3f} Score:{best_results["score"]:.2f} Diversity:{diversity:.2f}')
                 # Save results so folks can listen
-                torch.save(best_voice, f'{results_dir}/{self.target_audio}_{best_voice}_{best_results["score"]:.2f}_{best_results["target_similarity"]:.2f}_{i}.pt')
+                torch.save(best_voice,
+                           f'{results_dir}/{self.output_name}_{self.target_audio}_{best_results["score"]:.2f}_{best_results["target_similarity"]:.2f}_{i}.pt')
                 sf.write(f'{results_dir}/{best_results["score"]:.2f}_{best_results["target_similarity"]:.2f}_{i}.wav', best_results["audio"], 24000)
 
         # Print Final Results for Random Walk
+        # TODO solve for tracking naming of tensor.
         print("Random Walk Final Results")
         print(f"Duration: {t.format_dict['elapsed']}")
-        print(f"Best Voice: {best_voice}")
+        print(f"Voice Name: {self.output_name}")
         print(f"Best Score: {best_results['score']:.2f}_")
         print(f"Best Similarity: {best_results['target_similarity']:.2f}_")
         print(f"Random Walk pt and wav files ---> {results_dir}")
-
         return
 
     def score_voice(self,voice: torch.Tensor,min_similarity: float = 0.0) -> dict[str,Any]:

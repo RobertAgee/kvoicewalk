@@ -3,11 +3,11 @@ import os
 import numpy as np
 import torch
 
+from main import INTERPOLATED_DIR
 from utilities.fitness_scorer import FitnessScorer
 from utilities.pytorch_sanitizer import load_voice_safely
 from utilities.speech_generator import SpeechGenerator
 
-INTERPOLATED_DIR = os.environ.get("KVOICEWALK_OUT_DIR", "../interpolated")
 
 class InitialSelector:
     def __init__(self,target_path: str, target_text: str, other_text: str, voice_folder: str = "./voices",) -> None:

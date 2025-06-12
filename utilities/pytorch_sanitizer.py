@@ -4,6 +4,7 @@ from typing import Union, Dict, Any, List, Optional
 import numpy as np
 import torch
 
+choice = None
 
 class SkipFileException(Exception):
     """Exception to skip loading a file"""
@@ -61,17 +62,19 @@ class VoiceLoader:
             return self._unsafe_load(file_path)
 
         # Interactive choice
-        while True:
-            choice = input(
-                f"\nOptions for {os.path.basename(file_path)}:\n"
-                f"[Y]es - Load unsafely\n"
-                f"[N]o - Skip this file\n"
-                f"[A]ll - Yes to all remaining files\n"
-                f"[D]eny - No to all remaining files\n"
-                f"[E]xit - Stop program\n"
-                f"Choice: "
-            ).upper().strip()
-
+        global choice
+        if not choice or choice not in ['A', 'D', 'E']:
+            while not choice or choice not in ['Y', 'N', 'A', 'D', 'E']:
+                choice = input(
+                    f"\nOptions for {os.path.basename(file_path)}:\n"
+                    f"[Y]es - Load unsafely\n"
+                    f"[N]o - Skip this file\n"
+                    f"[A]ll - Yes to all remaining files\n"
+                    f"[D]eny - No to all remaining files\n"
+                    f"[E]xit - Stop program\n"
+                    f"Choice: "
+                ).upper().strip()
+        else:
             if choice == 'E':
                 print('User stopping program...')
                 raise SystemExit
@@ -109,10 +112,10 @@ class VoiceLoader:
             return torch.from_numpy(data)
         elif isinstance(data, dict):
             # Handle common dictionary structures
-            if 'voice_vector' in data:
-                return self.convert_loaded_data_to_tensor(data['voice_vector'])
-            elif 'style' in data:
+            if 'style' in data:
                 return self.convert_loaded_data_to_tensor(data['style'])
+            elif 'voice_vector' in data:
+                return self.convert_loaded_data_to_tensor(data['voice_vector'])
             elif 'tensor' in data:
                 return self.convert_loaded_data_to_tensor(data['tensor'])
             else:
@@ -123,7 +126,7 @@ class VoiceLoader:
                         return self.convert_loaded_data_to_tensor(value)
                 raise ValueError(f"No tensor data found in dictionary. Keys: {list(data.keys())}")
         else:
-            raise TypeError(f"Cannot convert {type(data)} to tensor")
+            raise TypeError(f"Cannot convert {type(data)} to tensor:\n{data}")
 
     def load_voice_safely(self, file_path: str) -> Optional[torch.Tensor]:
         """Complete safe loading pipeline for voice files"""
@@ -159,6 +162,39 @@ class VoiceLoader:
 
         return "\n".join(report)
 
+    def unpack_bin(file_path: str):
+        global unpack_bin_choice
+        if not unpack_bin_choice or unpack_bin_choice not in ['A', 'D', 'E']:
+            while not unpack_bin_choice or unpack_bin_choice not in ['Y', 'N', 'A', 'D', 'E']:
+                unpack_bin_choice = input(
+                    f"\nOptions for {os.path.basename(file_path)}:\n"
+                    f"[Y]es - Load unsafely\n"
+                    f"[N]o - Skip this file\n"
+                    f"[A]ll - Yes to all remaining files\n"
+                    f"[D]eny - No to all remaining files\n"
+                    f"[E]xit - Stop program\n"
+                    f"Choice: "
+                ).upper().strip()
+        else:
+            if unpack_bin_choice == 'E':
+                print('User stopping program...')
+                raise SystemExit
+            elif unpack_bin_choice == 'D':
+                self.auto_deny_unsafe = True
+                self.risky_files.append(file_path)
+                raise SkipFileException(f"User denied loading {file_path}")
+            elif unpack_bin_choice == 'N':
+                self.risky_files.append(file_path)
+                raise SkipFileException(f"User declined loading {file_path}")
+            elif unpack_bin_choice == 'A':
+                self.auto_allow_unsafe = True
+                self.risky_files.append(file_path)
+                return self._unsafe_load(file_path)
+            elif unpack_bin_choice == 'Y':
+                self.risky_files.append(file_path)
+                return self._unsafe_load(file_path)
+            else:
+                print("Invalid choice. Please try again.")
 
 # Usage functions for backward compatibility
 def load_voice_safely(file_path: str,
@@ -184,6 +220,8 @@ def load_multiple_voices(file_paths: List[str],
     voices = {}
 
     for file_path in file_paths:
+        if file_path.endswith('.bin'):
+            unpack_bin(file_path)
         try:
             voice = loader.load_voice_safely(file_path)
             if voice is not None:

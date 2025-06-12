@@ -5,7 +5,11 @@ from pathlib import Path
 
 from faster_whisper import WhisperModel
 
-TEXTS_DIR = os.environ.get("KVOICEWALK_OUT_DIR", "../texts")
+from main import TEXTS_DIR
+
+
+# TODO: Consider merge into single audio utilities
+# TODO: Integrate into automated workflows
 
 def transcribe(input_audio):
     model_size = "large-v3"
@@ -75,5 +79,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-#TODO: Integrate into automated workflows

@@ -7,7 +7,7 @@ from kokoro import KPipeline
 
 class SpeechGenerator:
     def __init__(self):
-        surpressWarnings()
+        # surpressWarnings()
         self.pipeline = KPipeline(lang_code="a",repo_id='hexgrad/Kokoro-82M')
 
     def generate_audio(self, text: str, voice: torch.Tensor,speed: float = 1.0) -> np.typing.NDArray[np.float32]:

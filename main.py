@@ -10,6 +10,11 @@ from utilities.speech_generator import SpeechGenerator
 from utilities.transcriber import transcribe
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+IN_DIR = os.environ.get("KVOICEWALK_TEXTS_DIR", "../in")
+OUT_DIR = os.environ.get("KVOICEWALK_OUT_DIR", "../out")
+INTERPOLATED_DIR = os.environ.get("KVOICEWALK_INTERPOLATED_DIR", "../interpolated")
+TEXTS_DIR = os.environ.get("KVOICEWALK_TEXTS_DIR", "../texts")
+VOICES_DIR = os.environ.get("KVOICEWALK_VOICES_DIR", "../voices")
 
 def main():
     parser = argparse.ArgumentParser(description="A random walk Kokoro voice cloner.")
@@ -22,47 +27,48 @@ def main():
                       help="A segment of text used to compare self similarity. Should be around 100-200 tokens.",
                       default="If you mix vinegar, baking soda, and a bit of dish soap in a tall cylinder, the resulting eruption is both a visual and tactile delight, often used in classrooms to simulate volcanic activity on a miniature scale.")
     parser.add_argument("--voice_folder", type=str,
-                      help="Path to the voices you want to use as part of the random walk.",
+                        help="Input: filepath to the voices you want to use as part of the random walk.",
                       default="./voices")
     parser.add_argument("--transcribe_start",
-                      help="Transcribe audio file. Transcript. Replaces --target_text and copy txt goes into ./texts",
-                      action='store_true')
+                        help='Input: filepath to wav file\nOutput: Transcription .txt in ./texts\nTranscribes a target wav or wav folder. Replaces --target_text')
     parser.add_argument("--interpolate_start",
                       help="Goes through an interpolation search step before random walking",
                       action='store_true')
     parser.add_argument("--population_limit", type=int,
-                      help="Limits the amount of voices used as part of the random walk",
+                        help="Limit the number of voices used as part of the random walk",
                       default=10)
     parser.add_argument("--step_limit", type=int,
-                      help="Limits the amount of steps in the random walk",
+                        help="Specify the max steps in the random walk",
                       default=10000)
     parser.add_argument("--output", type=str,
-                      help="Filename for the generated output audio",
-                      default="out.wav")
-
+                        help="Input: Name for the generated output audio",
+                        default="out")
     # Arguments for random walk mode
     group_walk = parser.add_argument_group('Random Walk Mode')
     group_walk.add_argument("--target_audio", type=str,
-                          help="Path to the target audio file. Must be 24000 Hz mono wav file.")
+                            help="Input: filepath to the target audio file.")
     group_walk.add_argument("--starting_voice", type=str,
-                          help="Path to the starting voice tensor")
+                            help="Input: filepath to the starting voice tensor")
 
     # Arguments for test mode
     group_test = parser.add_argument_group('Test Mode')
     group_test.add_argument("--test_voice", type=str,
-                          help="Path to the voice tensor you want to test")
+                            help="Input: filepath to the voice tensor you want to test")
 
     # Arguments for util mode
     group_util = parser.add_argument_group('Utility Mode')
-    # TODO: Add ffmpeg file prep
-    group_util.add_argument("--export_bin",
-                      help='Exports target voices in the --voice_folder directory',
+    # TODO: Add import function
+    # TODO: Add convert to/from npy/npz
+    group_util.add_argument("--import_voices",
+                            help='Input: filepath to npy (safer), npz (safer), pt, or bin\nOutput: ./out folder\nImports voice models into the --voice_folder directory')
+    group_util.add_argument("--export_voices", default='npz',
+                            help='Exports all voice models from the --voice_folder directory to ./out folder,\nExport formats: npz, bin',
                       action='store_true')
     group_util.add_argument("--transcribe_many",
-                      help='Transcribes a target wav or wav folder. Individual transcriptions go to ./texts. Replaces --target_text')
+                            help='Input: filepath to wav file or folder\nOutput: Individualized transcriptions in ./texts folder\nTranscribes a target wav or wav folder. Replaces --target_text', )
     args = parser.parse_args()
 
-    # Main Mode
+    # Normal Transcription Mode
     if args.transcribe_start:
         try:
             if os.path.isfile(args.target_audio) and args.target_audio.endswith('.wav'):
@@ -75,20 +81,28 @@ def main():
         except Exception as e:
             print(f"Error during Transcription: {e}")
 
-    # Export Utility
-    if args.export_bin:
+    # Utility Functions
+    # Import Voices
+    if args.import_npz:
         if not args.voice_folder:
-            parser.error("--voice_folder is required to export a voices bin file")
+            parser.error("--voice_folder is required to import a voices .npz file")
+        # TODO: Add import function, validation
 
-        # Collect all .pt file paths
-        file_paths = [os.path.join(args.voice_folder, f) for f in os.listdir(args.voice_folder) if f.endswith('.pt')]
-        voices = load_multiple_voices(file_paths, auto_allow_unsafe=False) # Set True if you prefer to bypass Allow/Repair/Reject voice file menu
+    # Export Voices
+    if args.export_npz:
+        if not args.voice_folder:
+            parser.error("--voice_folder is required to export a voices .npz file")
 
-        with open("voices.bin", "wb") as f:
+        # Collect all .npy file paths
+        file_paths = [os.path.join(args.voice_folder, f) for f in os.listdir(args.voice_folder) if f.endswith('.npy')]
+        voices = load_multiple_voices(file_paths)
+
+        with open("voices.npz", "wb") as f:
             np.savez(f,**voices)
 
         return
 
+    # Transcription
     if args.transcribe_many:
         try:
             if os.path.isfile(args.transcribe_many) and args.target_audio.endswith('.wav'):
@@ -109,7 +123,7 @@ def main():
     # If text file, read and assign transcription.
     if args.target_text.endswith('.txt'):
         try:
-            if (os.path.isfile(args.transcribe_many) and args.target_audio.endswith('.txt')):
+            if os.path.isfile(args.transcribe_many) and args.target_audio.endswith('.txt'):
                 with open(args.target_text, "r") as file:
                     args.target_text = file.read()
             else:
@@ -125,7 +139,7 @@ def main():
 
         speech_generator = SpeechGenerator()
         audio = speech_generator.generate_audio(args.target_text, args.test_voice)
-        sf.write(args.output, audio, 24000)
+        sf.write(f"{args.output}.wav", audio, 24000)
     else:
         # Random walk mode
         if not args.target_audio:
@@ -139,7 +153,8 @@ def main():
                         args.voice_folder,
                         args.interpolate_start,
                         args.population_limit,
-                        args.starting_voice)
+                         args.starting_voice,
+                         args.output)
         ktb.random_walk(args.step_limit)
 
 if __name__ == "__main__":
