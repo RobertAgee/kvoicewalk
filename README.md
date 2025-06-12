@@ -32,7 +32,7 @@ uv sync
 ffmpeg -i input_file.wav -ar 24000 target.wav
 ```
 
-3. Use [uv](https://docs.astral.sh/uv/) to run the application with arguments
+3. Use [uv](https://docs.astral.sh/uv/) to run the application with arguments.
 
 ```bash
 uv run main.py --target_text "The old lighthouse keeper never imagined that one day he'd be guiding ships from the comfort of his living room, but with modern technology and an array of cameras, he did just that, sipping tea while the storm raged outside and gulls shrieked overhead." --target_audio ./example/target.wav
@@ -46,7 +46,7 @@ uv run main.py --test_voice /path/to/voice.pt --target_text "Your really awesome
 
 This will generate an audio file called out.wav using the supplied *.pt file you give it. This way you can easily test a variety of voice tensors and input text.
 
-Play with the command line arguments and find what works for you. This is a fairly random process and processing for a long time could suddenly result in a better outcome. You can create a folder of your favorite sounding voices from the other random walks and use that as the basis for interpolation or just use that as the source for the next random walk. You can pass **starting_voice** argument to tell the system exactly what to use as a base if you want. Playing around with the options can get you a voice closer to the stlye of the target.
+Play with the command line arguments and find what works for you. This is a fairly random process and processing for a long time could suddenly result in a better outcome. You can create a folder of your favorite sounding voices from the other random walks and use that as the basis for interpolation or just use that as the source for the next random walk. You can pass **starting_voice** argument to tell the system exactly what to use as a base if you want. Playing around with the options can get you a voice closer to the style of the target.
 
 ## Interpolated Start
 KVoiceWalk has a function to interpolate around the trained voices and determine the best possible starting population of tensors to act as a guide for the random walk function to clone the target voice. Simply run the application as follows to run interpolation first. This does take awhile and having a beefy GPU will help with processing time.
@@ -86,3 +86,65 @@ Other things you could do:
 - Populate a database with results from this and train a model to predict similarity and see if you can use that to more tightly guide voice creation
 - Use different methods for voice generation than my simple method, though PCA had some challenges
 - Implement your own genetic algorithm and evolve voice tensors instead of random walk
+
+## KVoiceWalk Features
+
+## Transcribe Start, --transcribe_start
+KvoiceWalk con use Faster-Whisper to quickly convert your audio clip to text and update your --target_text. A copy of the transcription is also saved as a txt file in the ./texts folder. Txt files can be used as the --target-text argument with a relative path /path/to/your/transcribed.txt. This can be combined with --interpolate_start also.
+
+```bash
+uv run main.py --target_text "This text will be replaced!" --target_audio /path/to/target.wav --transcribe_start
+
+uv run main.py --target_text /path/to/your/transcribed.txt --target_audio /path/to/target.wav
+```
+
+## Transcribe Many, --transcribe_many
+KVoiceWalk can be used for file prep prior to your runs. With --transcribe_many, single file wav or folders containing wav files may be transcribed and their transcriptions saved as individual txt files in the ./texts folder.
+
+```bash
+uv run main.py --target_audio /path/to/target.wav --transcribe_many
+
+uv run main.py --target_audio /path/to/audio/Folder/ --transcribe_many
+```
+
+## Export Voices, --voices_folder and --export_bin
+Voices with a folder can be exported by passing --voices_folder and --export_bin in the command line. All .pt voices in the --voices_folder /path/to/your/voices/ argument will be packaged together as 'voices.bin' and saved in the same folder.
+
+```bash
+uv run main.py --voices_folder ./voices --export_bin
+```
+
+## All KVoiceWalk Arguments
+```
+## General Arguments
+"--target_text", type=str, help="The words contained in the target audio file.
+    Should be around 100-200 tokens (two sentences). Alternatively, can point to a txt file of the transcription."
+
+"--other_text", type=str, help="A segment of text used to compare self similarity. Should be around 100-200 tokens." 
+    default="If you mix vinegar, baking soda, and a bit of dish soap in a tall cylinder, the resulting eruption is both
+    a visual and tactile delight, often used in classrooms to simulate volcanic activity on a miniature scale."
+
+"--voice_folder", type=str, help="Path to the voices you want to use as part of the random walk.", default="./voices"
+
+"--transcribe_start", help="Transcribe audio file. Transcript. Replaces --target_text and copy txt goes into ./texts", action='store_true'
+
+"--interpolate_start", help="Goes through an interpolation search step before random walking", action='store_true'
+
+"--population_limit", type=int, help="Limits the amount of voices used as part of the random walk", default=10
+
+"--step_limit", type=int, help="Limits the amount of steps in the random walk", default=10000)
+
+"--output", type=str, help="Filename for the generated output audio", default="out.wav")
+
+## Arguments for Random Walk mode
+"--target_audio", type=str, help="Path to the target audio file. Must be 24000 Hz mono wav file."
+
+"--starting_voice", type=str, help="Path to the starting voice tensor"
+
+## Arguments for Test mode
+"--test_voice", type=str, help="Path to the voice tensor you want to test"
+
+## Arguments for Util mode
+"--export_bin", help='Exports target voices in the --voice_folder directory', action='store_true'
+
+"--transcribe_many", help='Transcribes a target wav or wav folder. Individual transcriptions go to ./texts. Replaces --target_text
